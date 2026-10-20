@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}TrialGuard AI - Deneme Suiistimal Tespiti{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="app-title">{{ app_title }}</h1>
+    <p class="tagline">{{ tagline }}</p>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Yeni Deneme Kaydı Ekle</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('feature.index') }}">
+                <input type="hidden" name="action" value="add_trial">
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label for="user_id">Kullanıcı ID:</label>
+                        <input type="text" id="user_id" name="user_id" class="form-control" required placeholder="Örn: user_123">
+                    </div>
+                    <div class="form-group">
+                        <label for="ip_address">IP Adresi:</label>
+                        <input type="text" id="ip_address" name="ip_address" class="form-control" required placeholder="Örn: 192.168.1.1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="user_agent">User-Agent:</label>
+                    <textarea id="user_agent" name="user_agent" class="form-control" rows="3" required placeholder="Örn: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="timestamp">Zaman Damgası (YYYY-MM-DD HH:MM:SS):</label>
+                    <input type="text" id="timestamp" name="timestamp" class="form-control" required value="{{ current_time }}">
+                </div>
+                <button type="submit" class="btn">Kaydı Ekle</button>
+            </form>
+            <hr>
+            <div class="grid grid-2">
+                <form method="POST" action="{{ url_for('feature.index') }}">
+                    <input type="hidden" name="action" value="load_sample">
+                    <button type="submit" class="btn btn-secondary">Örnek Veriyle Dene</button>
+                </form>
+                <form method="POST" action="{{ url_for('feature.index') }}">
+                    <input type="hidden" name="action" value="analyze">
+                    <button type="submit" class="btn btn-secondary">Deneme Kayıtlarını Analiz Et</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% if analysis_summary %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Analiz Sonuçları</h3>
+        </div>
+        <div class="card-body">
+            {% if flagged_accounts %}
+                <div class="alert alert-warning">
+                    <p><strong>Potansiyel Suiistimal Tespit Edilen Kullanıcılar:</strong></p>
+                    <ul>
+                        {% for user_id in flagged_accounts %}
+                            <li>{{ user_id }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="alert alert-success">
+                    <p>Herhangi bir suiistimal tespit edilmedi.</p>
+                </div>
+            {% endif %}
+            <p>Detaylı Analiz Özeti:</p>
+            <ul>
+                {% for summary_item in analysis_summary %}
+                    <li>{{ summary_item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Tüm Deneme Kayıtları</h3>
+        </div>
+        <div class="card-body">
+            {% if trials %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Kullanıcı ID</th>
+                            <th>IP Adresi</th>
+                            <th>User-Agent (Kısaltılmış)</th>
+                            <th>Zaman Damgası</th>
+                            <th>Cihaz Parmak İzi (Kısaltılmış)</th>
+                            <th>OS / Tarayıcı</th>
+                            <th>Mobil</th>
+                            <th>Ülke / Şehir</th>
+                            <th>Suiistimal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trial in trials %}
+                        <tr>
+                            <td>{{ trial.id }}</td>
+                            <td>{{ trial.user_id }}</td>
+                            <td>{{ trial.ip_address }}</td>
+                            <td>{{ trial.user_agent[:50] }}...</td>
+                            <td>{{ trial.timestamp }}</td>
+                            <td>{{ trial.device_fingerprint[:8] }}...</td>
+                            <td>{{ trial.os }} / {{ trial.browser }}</td>
+                            <td>{% if trial.is_mobile %}Evet{% else %}Hayır{% endif %}</td>
+                            <td>{{ trial.country }} / {{ trial.city }}</td>
+                            <td>
+                                {% if trial.is_abusive %}
+                                    <span class="badge alert-warning">Evet</span>
+                                {% else %}
+                                    <span class="badge">Hayır</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="muted">Henüz hiç deneme kaydı bulunmuyor.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
