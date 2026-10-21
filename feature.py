@@ -6,7 +6,6 @@ bp = Blueprint("feature", __name__, template_folder="templates", static_folder="
 
 @bp.before_request
 def before_request():
-    # Her istekte DB'nin başlatıldığından emin ol, idempotent bir fonksiyondur.
     logic.init_db(logic.DB_PATH)
 
 @bp.route("/", methods=["GET", "POST"])
@@ -58,9 +57,8 @@ def index():
                 flash(f"Analiz sırasında hata oluştu: {e}", "error")
             return redirect(url_for("feature.index"))
 
-    # GET isteği veya POST sonrası yönlendirme
     trials = logic.get_all_trials()
-    flagged_accounts, analysis_summary = logic.analyze_trials() # En güncel durumu göstermek için analizi tekrar çalıştır
+    flagged_accounts, analysis_summary = logic.analyze_trials()
 
     return render_template(
         "index.html",

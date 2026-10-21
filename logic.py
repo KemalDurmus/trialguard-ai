@@ -30,7 +30,6 @@ def init_db(db_path=DB_PATH):
 
 def _generate_device_fingerprint(user_agent_string):
     ua = parse_user_agent(user_agent_string)
-    # Basit bir cihaz parmak izi oluşturma. Gerçek bir senaryoda, istemci tarafı JS ile daha fazla veri toplanır.
     fingerprint_components = [
         ua.os.family,
         ua.os.version_string,
@@ -43,7 +42,6 @@ def _generate_device_fingerprint(user_agent_string):
     return hashlib.sha256("".join(fingerprint_components).encode()).hexdigest()
 
 def _simulate_geo_ip(ip_address):
-    # geoip2 kütüphanesi ve veritabanı gerektirdiğinden ve ağ çağrıları yasak olduğundan, basit bir simülasyon.
     if ip_address.startswith("192.168.") or ip_address.startswith("10.") or ip_address.startswith("172.16."):
         return "Yerel Ağ", "Yerel Ağ"
     elif ip_address == "127.0.0.1":
@@ -92,7 +90,6 @@ def analyze_trials(db_path=DB_PATH, time_window_hours=24):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Analizden önce tüm suiistimal bayraklarını sıfırla
     cursor.execute("UPDATE trials SET is_abusive = 0")
     conn.commit()
 
@@ -119,12 +116,9 @@ def analyze_trials(db_path=DB_PATH, time_window_hours=24):
             distinct_users_in_window[entry["user_id"]].append(entry["timestamp"])
 
         if len(distinct_users_in_window) > 1:
-            # Aynı IP ve cihaz parmak izinden birden fazla farklı kullanıcı ID'si tespit edildi.
-            # Bu, tek bir cihazdan birden fazla hesap açma suiistimalinin güçlü bir göstergesidir.
             for user_id in distinct_users_in_window.keys():
                 flagged_accounts.add(user_id)
                 analysis_summary.append(f"Potansiyel suiistimal: '{user_id}' kullanıcısı, aynı IP ({ip}) ve cihaz parmak izi ({device_fp[:8]}...) ile diğer kullanıcılarla birlikte tespit edildi.")
-                # Bu kullanıcı ID'si, IP ve cihaz parmak izi kombinasyonuyla ilişkili tüm kayıtları suiistimal olarak işaretle
                 cursor.execute("UPDATE trials SET is_abusive = 1 WHERE user_id = ? AND ip_address = ? AND device_fingerprint = ?", (user_id, ip, device_fp))
                 conn.commit()
 
@@ -134,7 +128,6 @@ def analyze_trials(db_path=DB_PATH, time_window_hours=24):
 def generate_sample_data():
     now = datetime.now()
     sample_data = [
-        # Meşru kullanıcılar
         {
             "user_id": "user_a",
             "ip_address": "5.10.10.1",
@@ -147,7 +140,6 @@ def generate_sample_data():
             "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.3 Safari/605.1.15",
             "timestamp": (now - timedelta(days=4)).strftime("%Y-%m-%d %H:%M:%S")
         },
-        # Aynı IP'den gelen meşru aile üyeleri, farklı cihazlar (farklı parmak izleri)
         {
             "user_id": "family_member_1",
             "ip_address": "192.168.1.100",
@@ -160,7 +152,6 @@ def generate_sample_data():
             "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/99.0.4844.83 Mobile/15E148 Safari/604.1",
             "timestamp": (now - timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         },
-        # Suiistimal örneği: Aynı cihazdan (aynı parmak izi), birden fazla farklı kullanıcı ID'si
         {
             "user_id": "abuser_1_account_1",
             "ip_address": "8.8.8.8",
@@ -179,7 +170,6 @@ def generate_sample_data():
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36",
             "timestamp": now.strftime("%Y-%m-%d %H:%M:%S")
         },
-        # Başka bir suiistimal örneği: Aynı IP'den, ufak UA değişiklikleriyle farklı parmak izi denemesi (ancak yine de aynı IP'den birden fazla hesap)
         {
             "user_id": "abuser_2_account_1",
             "ip_address": "5.10.10.50",
