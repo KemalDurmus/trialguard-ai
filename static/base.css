@@ -38,5 +38,6 @@ th { font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color:
 .hq-inline { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 320px; max-width: 460px; }
 .hq-inline input { flex: 1 1 200px; }
 .hq-inline button { margin-top: 0; }
+.hq-buy { border: 2px solid var(--primary, #4f46e5); margin-bottom: 14px; }
 .hq-feedback { margin: 8px 0 0; }
 .hq-feedback summary { cursor: pointer; color: var(--muted); }

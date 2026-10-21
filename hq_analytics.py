@@ -2,6 +2,7 @@
 
 - Sayfa görüntüleme + günlük tekil ziyaretçi (IP/UA özeti saklanır, ham IP saklanmaz)
 - Bekleme listesi (/_hq/waitlist) ve geri bildirim (/_hq/feedback)
+- Satın alma isteği (/_hq/buy): anında Telegram bildirimi; PAYMENT_URL ayarlıysa ödeme sayfasına yönlendirir
 - /stats: STATS_TOKEN ile korunan özet; Agent HQ Analiz ekibi düzenli okur
 - Yeni kayıt/geri bildirim olunca (HQ_TG_TOKEN + HQ_TG_CHAT varsa) Telegram bildirimi
 
@@ -39,6 +40,7 @@ def _db() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS signups (ts TEXT, email TEXT UNIQUE, page TEXT);
         CREATE TABLE IF NOT EXISTS feedback (ts TEXT, text TEXT, page TEXT);
         CREATE TABLE IF NOT EXISTS events (ts TEXT, name TEXT, page TEXT);
+        CREATE TABLE IF NOT EXISTS purchases (ts TEXT, email TEXT, page TEXT);
     """)
     return conn
 
@@ -89,6 +91,8 @@ def _app_title() -> str:
 
 
 def init_app(app) -> None:
+    app.jinja_env.globals["hq_price"] = os.environ.get("PRICE_TEXT", "")
+
     @app.before_request
     def _track():
         if request.method != "GET" or request.path.startswith(SKIP_PREFIXES):
@@ -110,6 +114,20 @@ def init_app(app) -> None:
             _notify(f"🎉 {_app_title()}: yeni bekleme listesi kaydı → {email}")
         else:
             flash("Bu e-posta zaten listede. 🙌", "success")
+        return redirect(request.referrer or "/")
+
+    @app.post("/_hq/buy")
+    def _buy():
+        email = (request.form.get("email") or "").strip().lower()[:254]
+        if not EMAIL_RE.match(email):
+            flash("Lütfen geçerli bir e-posta adresi gir.", "error")
+            return redirect(request.referrer or "/")
+        _write("INSERT INTO purchases(ts, email, page) VALUES (?,?,?)", (_now(), email, (request.referrer or "")[:200]))
+        _notify(f"💰 SATIN ALMA İSTEĞİ — {_app_title()}\n{email}\nBu kişi ürünü almak istiyor; hemen ödeme bilgisiyle cevap ver.")
+        pay = os.environ.get("PAYMENT_URL")
+        if pay:
+            return redirect(pay)
+        flash("Teşekkürler! Ödeme ve kurulum bilgisini kısa süre içinde e-postana göndereceğiz. 🙌", "success")
         return redirect(request.referrer or "/")
 
     @app.post("/_hq/feedback")
@@ -148,5 +166,6 @@ def init_app(app) -> None:
                            q("SELECT path, COUNT(*) n FROM views GROUP BY path ORDER BY n DESC LIMIT 10")],
                 signups=[{"ts": t, "email": e} for t, e in q("SELECT ts, email FROM signups ORDER BY ts")],
                 feedback=[{"ts": t, "text": x} for t, x in q("SELECT ts, text FROM feedback ORDER BY ts")],
+                purchases=[{"ts": t, "email": e} for t, e in q("SELECT ts, email FROM purchases ORDER BY ts")],
                 events=[{"name": n, "count": c} for n, c in q("SELECT name, COUNT(*) FROM events GROUP BY name")],
             )

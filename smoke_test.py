@@ -21,18 +21,25 @@ def main() -> int:
     client = app.test_client()
     failures = 0
 
-    def check(method: str, path: str, data: dict | None = None) -> None:
+    def check(method: str, path: str, data: dict | None = None, strict: bool = False) -> None:
+        """strict=True (örnek akışlar): yönlendirmeler izlenir; 4xx/5xx ya da sayfadaki hata uyarısı başarısızlıktır."""
         nonlocal failures
         try:
-            resp = client.open(path, method=method, data=data or None)
+            resp = client.open(path, method=method, data=data or None, follow_redirects=strict)
         except Exception:
             failures += 1
             print(f"FAIL {method} {path} — istisna fırlattı:", file=sys.stderr)
             traceback.print_exc()
             return
-        if resp.status_code >= 500:
+        limit = 400 if strict else 500
+        error_shown = strict and b"alert alert-error" in resp.data
+        if resp.status_code >= limit or error_shown:
             failures += 1
-            print(f"FAIL {method} {path} -> {resp.status_code}", file=sys.stderr)
+            why = "sayfada hata uyarısı gösterildi" if error_shown else f"-> {resp.status_code}"
+            hint = " (yanlış yol? rotalar: " + ", ".join(sorted({r.rule for r in app.url_map.iter_rules()
+                                                                 if r.endpoint != 'static'})) + ")" \
+                if resp.status_code == 404 else ""
+            print(f"FAIL {method} {path} {why}{hint}", file=sys.stderr)
         else:
             print(f"ok   {method} {path} -> {resp.status_code}")
 
@@ -44,7 +51,7 @@ def main() -> int:
     if samples_path.exists():
         for s in json.loads(samples_path.read_text(encoding="utf-8")):
             data = {f["name"]: f["value"] for f in s.get("form_fields", [])}
-            check(s["method"].upper(), s["path"], data)
+            check(s["method"].upper(), s["path"], data, strict=True)
 
     return 1 if failures else 0
 

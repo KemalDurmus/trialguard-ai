@@ -25,6 +25,16 @@
     {% block content %}{% endblock %}
   </main>
   <section class="container hq-cta">
+    <div class="card hq-cta-card hq-buy">
+      <div>
+        <h3>Pro'ya geç{% if hq_price %} · {{ hq_price }}{% endif %}</h3>
+        <p class="muted">Hemen kullanmaya başlamak istiyorsan e-postanı bırak; ödeme ve kurulum bilgisini sana gönderelim.</p>
+      </div>
+      <form method="post" action="/_hq/buy" class="hq-inline">
+        <input type="email" name="email" placeholder="e-posta adresin" required>
+        <button type="submit">Satın almak istiyorum</button>
+      </form>
+    </div>
     <div class="card hq-cta-card">
       <div>
         <h3>Yeni özelliklerden ilk sen haberdar ol</h3>
