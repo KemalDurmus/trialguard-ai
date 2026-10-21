@@ -15,6 +15,9 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(24).hex())
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB yükleme sınırı
+    # Werkzeug yapıştırılan metin alanlarını varsayılan olarak 500 KB ile sınırlar; büyük CSV/log yapıştırınca
+    # 413 verirdi. Dosya yüklemeyle aynı sınıra çekilir.
+    app.config["MAX_FORM_MEMORY_SIZE"] = app.config["MAX_CONTENT_LENGTH"]
 
     meta_path = BASE_DIR / "app_meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
