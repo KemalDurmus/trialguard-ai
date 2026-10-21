@@ -6,47 +6,31 @@
   },
   {
     "method": "POST",
-    "path": "/",
+    "path": "/analyze",
     "form_fields": [
       {
-        "name": "action",
-        "value": "load_sample"
+        "name": "sample_data",
+        "value": "1"
       }
     ]
   },
   {
     "method": "POST",
-    "path": "/",
+    "path": "/analyze",
     "form_fields": [
       {
-        "name": "action",
-        "value": "analyze"
+        "name": "signups",
+        "value": "email,ip,created_at\nann.lee@gmail.com,45.83.64.11,2025-09-01T10:00:00\nannlee+2@gmail.com,45.83.64.11,2025-09-01T11:00:00\nbob@mailinator.com,45.83.64.11,2025-09-01T12:00:00"
       }
     ]
   },
   {
     "method": "POST",
-    "path": "/",
+    "path": "/analyze",
     "form_fields": [
       {
-        "name": "action",
-        "value": "add_trial"
-      },
-      {
-        "name": "user_id",
-        "value": "test_user_1"
-      },
-      {
-        "name": "ip_address",
-        "value": "1.2.3.4"
-      },
-      {
-        "name": "user_agent",
-        "value": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36"
-      },
-      {
-        "name": "timestamp",
-        "value": "2023-10-27 10:00:00"
+        "name": "signups",
+        "value": "E-posta;IP adresi\nali@ornek.com;10.0.0.1\nveli@ornek.com;10.0.0.2"
       }
     ]
   }

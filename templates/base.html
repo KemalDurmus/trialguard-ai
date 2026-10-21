@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="{{ hq_lang() }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -27,29 +27,29 @@
   <section class="container hq-cta">
     <div class="card hq-cta-card hq-buy">
       <div>
-        <h3>Pro'ya geç{% if hq_price %} · {{ hq_price }}{% endif %}</h3>
-        <p class="muted">Hemen kullanmaya başlamak istiyorsan e-postanı bırak; ödeme ve kurulum bilgisini sana gönderelim.</p>
+        <h3>{{ hq_t('buy_title') }}{% if hq_price %} · {{ hq_price }}{% endif %}</h3>
+        <p class="muted">{{ hq_t('buy_text') }}</p>
       </div>
       <form method="post" action="/_hq/buy" class="hq-inline">
-        <input type="email" name="email" placeholder="e-posta adresin" required>
-        <button type="submit">Satın almak istiyorum</button>
+        <input type="email" name="email" placeholder="{{ hq_t('email_ph') }}" required>
+        <button type="submit">{{ hq_t('buy_btn') }}</button>
       </form>
     </div>
     <div class="card hq-cta-card">
       <div>
-        <h3>Yeni özelliklerden ilk sen haberdar ol</h3>
-        <p class="muted">Bekleme listesine katıl; ücretsiz erken erişim ve indirimler e-postana gelsin.</p>
+        <h3>{{ hq_t('wl_title') }}</h3>
+        <p class="muted">{{ hq_t('wl_text') }}</p>
       </div>
       <form method="post" action="/_hq/waitlist" class="hq-inline">
-        <input type="email" name="email" placeholder="e-posta adresin" required>
-        <button type="submit">Listeye katıl</button>
+        <input type="email" name="email" placeholder="{{ hq_t('email_ph') }}" required>
+        <button type="submit">{{ hq_t('wl_btn') }}</button>
       </form>
     </div>
     <details class="hq-feedback">
-      <summary>💬 Geri bildirim gönder</summary>
+      <summary>{{ hq_t('fb_summary') }}</summary>
       <form method="post" action="/_hq/feedback">
-        <textarea name="text" rows="3" maxlength="2000" placeholder="Neyi sevdin, ne eksik, ne için kullanırdın?" required></textarea>
-        <button type="submit" class="btn-secondary">Gönder</button>
+        <textarea name="text" rows="3" maxlength="2000" placeholder="{{ hq_t('fb_ph') }}" required></textarea>
+        <button type="submit" class="btn-secondary">{{ hq_t('fb_btn') }}</button>
       </form>
     </details>
   </section>

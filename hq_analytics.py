@@ -6,6 +6,8 @@
 - /stats: STATS_TOKEN ile korunan özet; Agent HQ Analiz ekibi düzenli okur
 - Yeni kayıt/geri bildirim olunca (HQ_TG_TOKEN + HQ_TG_CHAT varsa) Telegram bildirimi
 
+Dil: app_meta.json içindeki "lang" ("tr" varsayılan, "en") şablonun sabit metinlerini belirler.
+
 Not: Ücretsiz barındırmada disk geçicidir; uygulama yeniden başlayınca sayaçlar sıfırlanabilir.
 Bu yüzden /stats bir boot_id döndürür ve HQ her açılışın verisini ayrı ayrı biriktirir.
 """
@@ -82,16 +84,63 @@ def _notify(text: str) -> None:
     threading.Thread(target=send, daemon=True).start()
 
 
-def _app_title() -> str:
+def _meta() -> dict:
     try:
         import json
-        return json.loads((BASE / "app_meta.json").read_text(encoding="utf-8")).get("app_title", "App")
+        return json.loads((BASE / "app_meta.json").read_text(encoding="utf-8"))
     except Exception:
-        return "App"
+        return {}
+
+
+def _app_title() -> str:
+    return _meta().get("app_title", "App")
+
+
+STRINGS = {
+    "tr": {
+        "buy_title": "Pro'ya geç", "buy_btn": "Satın almak istiyorum",
+        "buy_text": "Hemen kullanmaya başlamak istiyorsan e-postanı bırak; ödeme ve kurulum bilgisini sana gönderelim.",
+        "buy_thanks": "Teşekkürler! Ödeme ve kurulum bilgisini kısa süre içinde e-postana göndereceğiz. 🙌",
+        "email_ph": "e-posta adresin", "bad_email": "Lütfen geçerli bir e-posta adresi gir.",
+        "wl_title": "Yeni özelliklerden ilk sen haberdar ol", "wl_btn": "Listeye katıl",
+        "wl_text": "Bekleme listesine katıl; ücretsiz erken erişim ve indirimler e-postana gelsin.",
+        "wl_thanks": "Teşekkürler! Listeye eklendin, yenilikleri ilk sen duyacaksın. 🎉",
+        "wl_dupe": "Bu e-posta zaten listede. 🙌",
+        "fb_summary": "💬 Geri bildirim gönder", "fb_btn": "Gönder",
+        "fb_ph": "Neyi sevdin, ne eksik, ne için kullanırdın?",
+        "fb_short": "Geri bildirim çok kısa.", "fb_thanks": "Geri bildirimin için teşekkürler! 💬",
+        "not_found": "Sayfa bulunamadı.", "too_large": "Dosya çok büyük (en fazla 10 MB).",
+    },
+    "en": {
+        "buy_title": "Get Pro", "buy_btn": "I want to buy",
+        "buy_text": "Want to start using it now? Leave your email and we'll send you payment and setup details.",
+        "buy_thanks": "Thanks! We'll email you payment and setup details shortly. 🙌",
+        "email_ph": "your email", "bad_email": "Please enter a valid email address.",
+        "wl_title": "Be the first to hear about new features", "wl_btn": "Join the waitlist",
+        "wl_text": "Join the waitlist for free early access and discounts.",
+        "wl_thanks": "Thanks! You're on the list — you'll hear about updates first. 🎉",
+        "wl_dupe": "This email is already on the list. 🙌",
+        "fb_summary": "💬 Send feedback", "fb_btn": "Send",
+        "fb_ph": "What did you like, what's missing, what would you use it for?",
+        "fb_short": "Feedback is too short.", "fb_thanks": "Thanks for your feedback! 💬",
+        "not_found": "Page not found.", "too_large": "File too large (max 10 MB).",
+    },
+}
+
+
+def lang() -> str:
+    return _meta().get("lang", "tr") if _meta().get("lang") in STRINGS else "tr"
+
+
+def t(key: str) -> str:
+    """Şablonun sabit metinleri, uygulamanın diline göre."""
+    return STRINGS[lang()].get(key, STRINGS["tr"][key])
 
 
 def init_app(app) -> None:
     app.jinja_env.globals["hq_price"] = os.environ.get("PRICE_TEXT", "")
+    app.jinja_env.globals["hq_t"] = t
+    app.jinja_env.globals["hq_lang"] = lang
 
     @app.before_request
     def _track():
@@ -107,37 +156,37 @@ def init_app(app) -> None:
     def _waitlist():
         email = (request.form.get("email") or "").strip().lower()[:254]
         if not EMAIL_RE.match(email):
-            flash("Lütfen geçerli bir e-posta adresi gir.", "error")
+            flash(t("bad_email"), "error")
         elif _write("INSERT INTO signups(ts, email, page) VALUES (?,?,?)",
                     (_now(), email, (request.referrer or "")[:200])):
-            flash("Teşekkürler! Listeye eklendin, yenilikleri ilk sen duyacaksın. 🎉", "success")
+            flash(t("wl_thanks"), "success")
             _notify(f"🎉 {_app_title()}: yeni bekleme listesi kaydı → {email}")
         else:
-            flash("Bu e-posta zaten listede. 🙌", "success")
+            flash(t("wl_dupe"), "success")
         return redirect(request.referrer or "/")
 
     @app.post("/_hq/buy")
     def _buy():
         email = (request.form.get("email") or "").strip().lower()[:254]
         if not EMAIL_RE.match(email):
-            flash("Lütfen geçerli bir e-posta adresi gir.", "error")
+            flash(t("bad_email"), "error")
             return redirect(request.referrer or "/")
         _write("INSERT INTO purchases(ts, email, page) VALUES (?,?,?)", (_now(), email, (request.referrer or "")[:200]))
         _notify(f"💰 SATIN ALMA İSTEĞİ — {_app_title()}\n{email}\nBu kişi ürünü almak istiyor; hemen ödeme bilgisiyle cevap ver.")
         pay = os.environ.get("PAYMENT_URL")
         if pay:
             return redirect(pay)
-        flash("Teşekkürler! Ödeme ve kurulum bilgisini kısa süre içinde e-postana göndereceğiz. 🙌", "success")
+        flash(t("buy_thanks"), "success")
         return redirect(request.referrer or "/")
 
     @app.post("/_hq/feedback")
     def _feedback():
         text = (request.form.get("text") or "").strip()[:2000]
         if len(text) < 3:
-            flash("Geri bildirim çok kısa.", "error")
+            flash(t("fb_short"), "error")
         else:
             _write("INSERT INTO feedback(ts, text, page) VALUES (?,?,?)", (_now(), text, (request.referrer or "")[:200]))
-            flash("Geri bildirimin için teşekkürler! 💬", "success")
+            flash(t("fb_thanks"), "success")
             _notify(f"💬 {_app_title()} geri bildirim: {text[:500]}")
         return redirect(request.referrer or "/")
 

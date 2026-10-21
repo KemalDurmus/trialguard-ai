@@ -1,4 +1,5 @@
 {
-  "app_title": "TrialGuard AI",
-  "tagline": "Cihaz parmak izi ve IP analizi ile ücretsiz deneme suiistimalini tespit et."
+  "app_title": "TrialGuard",
+  "tagline": "Find duplicate and throwaway signups in your free-trial list.",
+  "lang": "en"
 }

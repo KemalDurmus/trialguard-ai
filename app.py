@@ -23,7 +23,7 @@ def create_app() -> Flask:
     def inject_meta():
         return {"app_title": meta.get("app_title", "App"), "tagline": meta.get("tagline", "")}
 
-    from hq_analytics import init_app as init_analytics
+    from hq_analytics import init_app as init_analytics, t
     init_analytics(app)
 
     from feature import bp
@@ -35,11 +35,11 @@ def create_app() -> Flask:
 
     @app.errorhandler(404)
     def not_found(_):
-        return render_template("base.html", error="Sayfa bulunamadı."), 404
+        return render_template("base.html", error=t("not_found")), 404
 
     @app.errorhandler(413)
     def too_large(_):
-        return render_template("base.html", error="Dosya çok büyük (en fazla 10 MB)."), 413
+        return render_template("base.html", error=t("too_large")), 413
 
     return app
 

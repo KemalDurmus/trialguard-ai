@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_title }} — results{% endblock %}
+
+{% block content %}
+{% if sample %}<div class="alert alert-info">You're looking at sample data. Upload your own signup export to see your accounts.</div>{% endif %}
+{% for w in warnings %}<div class="alert alert-warning">{{ w }}</div>{% endfor %}
+
+<div class="grid">
+  <div class="card"><div class="muted">Signups checked</div><div class="stat">{{ r.total }}</div></div>
+  <div class="card"><div class="muted">Flagged accounts</div><div class="stat">{{ r.flagged }}</div>
+    <div class="muted">{{ "%.1f"|format(r.share) }}% of the list</div></div>
+  <div class="card"><div class="muted">High risk</div><div class="stat">{{ r.high }}</div>
+    <div class="muted">{{ r.disposable }} disposable email{{ '' if r.disposable == 1 else 's' }}</div></div>
+</div>
+
+{% if r.groups %}
+<div class="card" style="margin-top:16px">
+  <h2>Linked accounts</h2>
+  {% for g in r.groups %}
+  <div class="group">
+    <strong>{{ g.title }}</strong>
+    <div class="muted members">{{ g.members|join(", ") }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <h2 style="margin:0">Flagged accounts</h2>
+    {% if r.accounts %}<a class="btn btn-secondary" href="{{ r.csv_data_uri }}" download="trialguard-flagged.csv">Download CSV</a>{% endif %}
+  </div>
+  {% if r.accounts %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Risk</th><th>Account</th><th>Why</th></tr></thead>
+    <tbody>
+    {% for a in r.accounts %}
+      <tr>
+        <td><span class="badge risk-{{ a.level }}">{{ a.score }}</span></td>
+        <td class="acct">{{ a.email }}{% if a.id != a.email %}<div class="muted">{{ a.id }}</div>{% endif %}</td>
+        <td><ul class="why">{% for reason in a.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">Scores add up the evidence (60+ = high). A shared IP alone can be an office or school, so check
+    medium and low flags before blocking anyone.</p>
+  {% else %}
+  <p class="muted">No suspicious patterns in this list.</p>
+  {% endif %}
+</div>
+
+<p style="margin-top:16px"><a class="btn btn-secondary" href="{{ url_for('feature.index') }}">Check another list</a></p>
+
+<style>
+  .group { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .group:last-child { border-bottom: 0; }
+  .members { overflow-wrap: anywhere; }
+  .table-wrap { overflow-x: auto; }
+  .acct { white-space: nowrap; }
+  .why { margin: 0; padding-left: 16px; overflow-wrap: anywhere; }
+  .why li { margin: 2px 0; }
+  .risk-high { background: var(--error); color: #fff; }
+  .risk-medium { background: var(--warning); color: #111; }
+  @media (max-width: 820px) {
+    .table-wrap table, .table-wrap tbody, .table-wrap tr, .table-wrap td { display: block; }
+    .table-wrap thead { display: none; }
+    .table-wrap tr { padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .table-wrap td { border: 0; padding: 3px 0; }
+    .acct { white-space: normal; overflow-wrap: anywhere; font-weight: 600; }
+  }
+</style>
+{% endblock %}
