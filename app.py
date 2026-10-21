@@ -23,6 +23,9 @@ def create_app() -> Flask:
     def inject_meta():
         return {"app_title": meta.get("app_title", "App"), "tagline": meta.get("tagline", "")}
 
+    from hq_analytics import init_app as init_analytics
+    init_analytics(app)
+
     from feature import bp
     app.register_blueprint(bp)
 

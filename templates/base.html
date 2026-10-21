@@ -24,6 +24,25 @@
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  <section class="container hq-cta">
+    <div class="card hq-cta-card">
+      <div>
+        <h3>Yeni özelliklerden ilk sen haberdar ol</h3>
+        <p class="muted">Bekleme listesine katıl; ücretsiz erken erişim ve indirimler e-postana gelsin.</p>
+      </div>
+      <form method="post" action="/_hq/waitlist" class="hq-inline">
+        <input type="email" name="email" placeholder="e-posta adresin" required>
+        <button type="submit">Listeye katıl</button>
+      </form>
+    </div>
+    <details class="hq-feedback">
+      <summary>💬 Geri bildirim gönder</summary>
+      <form method="post" action="/_hq/feedback">
+        <textarea name="text" rows="3" maxlength="2000" placeholder="Neyi sevdin, ne eksik, ne için kullanırdın?" required></textarea>
+        <button type="submit" class="btn-secondary">Gönder</button>
+      </form>
+    </details>
+  </section>
   <footer class="container footer muted">© {{ app_title }}</footer>
   {% block scripts %}{% endblock %}
 </body>

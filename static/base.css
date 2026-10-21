@@ -31,3 +31,12 @@ th { font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color:
 .alert-warning, .alert-message, .alert-info { border-color: var(--warning); color: var(--warning); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: var(--border); }
 .footer { padding: 32px 16px; font-size: .9rem; }
+.hq-cta { margin-top: 36px; }
+.hq-cta-card { display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.hq-cta-card h3 { margin: 0 0 4px; }
+.hq-cta-card p { margin: 0; }
+.hq-inline { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 320px; max-width: 460px; }
+.hq-inline input { flex: 1 1 200px; }
+.hq-inline button { margin-top: 0; }
+.hq-feedback { margin: 8px 0 0; }
+.hq-feedback summary { cursor: pointer; color: var(--muted); }
