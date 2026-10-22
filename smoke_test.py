@@ -113,6 +113,22 @@ def main() -> int:
             else:
                 print(f"ok   büyük girdi ({len(big) // 1024} KB) -> {resp.status_code}")
 
+        # Bozuk girdi: ikili dosya içeriği (NUL, \r, kontrol karakterleri) yapıştırılınca 5xx olmamalı
+        if cand:
+            junk = "".join(map(chr, range(256))) * 20
+            data = {f["name"]: (junk if f is field else f["value"]) for f in s.get("form_fields", [])}
+            try:
+                resp = app.test_client().open(s["path"], method="POST", data=data, follow_redirects=True)
+                status, crash = resp.status_code, ""
+            except Exception as e:  # TESTING modunda istisna doğrudan buraya gelir
+                status, crash = 500, f"{type(e).__name__}: {e}"
+            if status >= 500:
+                failures += 1
+                print(f"FAIL bozuk/ikili girdi -> {status} {crash[:200]}: yanlış dosyada çökmemeli, kullanıcıya "
+                      "'bu dosya CSV/metin değil' gibi açık bir mesaj göstermeli", file=sys.stderr)
+            else:
+                print(f"ok   bozuk/ikili girdi -> {status}")
+
     after = snapshot()
     leaked = [p for p in pages if before[p] != after[p]]
     if leaked:

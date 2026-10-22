@@ -143,12 +143,32 @@ def is_disposable(domain: str) -> bool:
     return any(".".join(parts[i:]) in DISPOSABLE for i in range(len(parts) - 1))
 
 
+def _looks_binary(text: str) -> bool:
+    """Resim, zip, PDF gibi metin olmayan dosyalar: NUL ya da çok sayıda kontrol karakteri içerir."""
+    sample = text[:20000]
+    if "\x00" in sample:
+        return True
+    ctrl = sum(1 for ch in sample if ord(ch) < 32 and ch not in "\r\n\t")
+    return bool(sample) and ctrl / len(sample) > 0.02
+
+
+def _read_table(text: str, delim: str) -> list[list[str]]:
+    text = text.replace("\r\n", "\n").replace("\r", "\n")  # eski Mac satır sonları
+    try:
+        return [r for r in csv.reader(io.StringIO(text), delimiter=delim) if any(c.strip() for c in r)]
+    except csv.Error as e:
+        raise ParseError(f"This file couldn't be read as a CSV ({e}). Please export it again as CSV.") from e
+
+
 def parse_signups(text: str) -> tuple[list[dict], list[str]]:
     text = (text or "").lstrip("﻿").strip()
     if not text:
         raise ParseError("No data received. Paste a CSV or upload a file.")
+    if _looks_binary(text):
+        raise ParseError("This doesn't look like a CSV or text file (it may be an image, PDF or spreadsheet). "
+                         "Please export your signups as CSV and upload that.")
     delim = _sniff(text)
-    table = [r for r in csv.reader(io.StringIO(text), delimiter=delim) if any(c.strip() for c in r)]
+    table = _read_table(text, delim)
     if len(table) < 2:
         raise ParseError("The list needs a header row and at least one signup.")
     headers, body = table[0], table[1:MAX_ROWS + 1]
