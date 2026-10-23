@@ -20,7 +20,7 @@
   {% for g in r.groups %}
   <div class="group">
     <strong>{{ g.title }}</strong>
-    <div class="muted members">{{ g.members|join(", ") }}</div>
+    <div class="muted members">{{ g.members[:50]|join(", ") }}{% if g.members|length > 50 %} and {{ g.members|length - 50 }} more{% endif %}</div>
   </div>
   {% endfor %}
 </div>
@@ -36,7 +36,7 @@
   <table>
     <thead><tr><th>Risk</th><th>Account</th><th>Why</th></tr></thead>
     <tbody>
-    {% for a in r.accounts %}
+    {% for a in r.accounts[:500] %}
       <tr>
         <td><span class="badge risk-{{ a.level }}">{{ a.score }}</span></td>
         <td class="acct">{{ a.email }}{% if a.id != a.email %}<div class="muted">{{ a.id }}</div>{% endif %}</td>
@@ -46,6 +46,7 @@
     </tbody>
   </table>
   </div>
+  {% if r.accounts|length > 500 %}<p class="muted">Showing the 500 highest-risk accounts of {{ r.accounts|length }}. Download the CSV for the full list.</p>{% endif %}
   <p class="muted">Scores add up the evidence (60+ = high). A shared IP alone can be an office or school, so check
     medium and low flags before blocking anyone.</p>
   {% else %}

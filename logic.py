@@ -202,9 +202,13 @@ def parse_signups(text: str) -> tuple[list[dict], list[str]]:
 # --------------------------------------------------------------------------- #
 # Analysis
 # --------------------------------------------------------------------------- #
-def _members(group: list[dict], me: dict, limit: int = 3) -> str:
-    others = [g["email"] for g in group if g is not me]
-    return ", ".join(others[:limit]) + (f" +{len(others) - limit}" if len(others) > limit else "")
+def _members(emails: list[str], pos: int, limit: int = 3) -> str:
+    """Gruptaki diğer hesaplardan ilk `limit` tanesi (pos = bu hesabın gruptaki sırası).
+    Yalnızca listenin başına bakar: büyük gruplarda her satır için tüm grubu taramak O(n²) idi."""
+    head = emails[:limit + 1]
+    others = (head[:pos] + head[pos + 1:])[:limit]
+    rest = len(emails) - 1 - len(others)
+    return ", ".join(others) + (f" +{rest}" if rest > 0 else "")
 
 
 def analyze(rows: list[dict], burst_hours: int = 24, many_per_ip: int = 5) -> dict:
@@ -220,11 +224,12 @@ def analyze(rows: list[dict], burst_hours: int = 24, many_per_ip: int = 5) -> di
         for k, idx in buckets.items():
             if len(idx) >= min_size and len({rows[i]["email"] for i in idx}) >= min_size:
                 members = [rows[i] for i in idx]
-                for i in idx:
-                    flags[i][rule] = _reason(rule, n=len(idx) - 1, members=_members(members, rows[i]),
+                emails = [m["email"] for m in members]
+                for pos, i in enumerate(idx):
+                    flags[i][rule] = _reason(rule, n=len(idx) - 1, members=_members(emails, pos),
                                                           ip=rows[i]["ip"], pattern=k if isinstance(k, str) else "",
                                                           window="", domain="")
-                groups.append({"rule": rule, "title": title_fn(k, members), "members": [m["email"] for m in members]})
+                groups.append({"rule": rule, "title": title_fn(k, members), "members": emails})
 
     group_by(lambda r: canonical_inbox(r["email"]), "inbox", lambda k, m: f"{len(m)} accounts, one inbox ({k})")
     group_by(lambda r: r["device"], "device", lambda k, m: f"{len(m)} accounts on device {k[:24]}")
@@ -242,12 +247,13 @@ def analyze(rows: list[dict], burst_hours: int = 24, many_per_ip: int = 5) -> di
             continue
         dated = sorted((i for i in idx if rows[i]["at"]), key=lambda i: rows[i]["at"])
         burst: set[int] = set()
-        start = 0
+        start = added = 0  # added: dated[:added] içinden pencereye girenler zaten burst'te
         for end in range(len(dated)):
             while rows[dated[end]]["at"] - rows[dated[start]]["at"] > window:
                 start += 1
             if end - start + 1 >= 3:
-                burst.update(dated[start:end + 1])
+                burst.update(dated[max(start, added):end + 1])
+                added = end + 1
         if burst:
             for i in burst:
                 flags[i]["ip_burst"] = _reason("ip_burst", n=len(burst) - 1, ip=ip,
@@ -299,9 +305,12 @@ def analyze(rows: list[dict], burst_hours: int = 24, many_per_ip: int = 5) -> di
     order = ["inbox", "device", "ip_burst", "ip_ua", "numbered", "ip_many"]
     groups.sort(key=lambda g: (order.index(g["rule"]), -len(g["members"])))
     kept: list[dict] = []
+    kept_sets: list[set[str]] = []
     for g in groups:  # aynı hesapları daha güçlü bir grup zaten gösteriyorsa tekrar listeleme
-        if not any(set(g["members"]) <= set(k["members"]) for k in kept):
+        members = set(g["members"])
+        if not any(members <= k for k in kept_sets):
             kept.append(g)
+            kept_sets.append(members)
     groups = kept
     high = sum(a["level"] == "high" for a in accounts)
     return {"total": len(rows), "flagged": len(accounts), "high": high, "disposable": disposable,
