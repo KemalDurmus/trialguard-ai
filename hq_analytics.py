@@ -5,7 +5,8 @@
 - Satın alma isteği (/_hq/buy): anında Telegram bildirimi; PAYMENT_URL ayarlıysa ödeme sayfasına yönlendirir
 - Hata alarmı: uygulamada ERROR seviyesinde kaydedilen her istisna (yakalanmamış 500'ler dahil) anında Telegram'a
   gider (aynı hata 10 dakikada en fazla bir kez) ve /stats içinde raporlanır. /_hq/selftest-error (STATS_TOKEN ile)
-  alarmı canlıda denemek için bilerek hata üretir.
+  alarmı canlıda denemek için bilerek hata üretir. /_hq/buy-selftest (STATS_TOKEN ile) satın alma bildirimini
+  istatistiğe yazmadan dener.
 - /stats: STATS_TOKEN ile korunan özet; Agent HQ Analiz ekibi düzenli okur
 - Yeni kayıt/geri bildirim olunca (HQ_TG_TOKEN + HQ_TG_CHAT varsa) Telegram bildirimi
 
@@ -75,19 +76,24 @@ def _visitor() -> str:
     return hashlib.sha256(f"{ip}|{ua}|{day}".encode()).hexdigest()[:16]
 
 
-def _notify(text: str) -> None:
+def _notify(text: str, wait: bool = False) -> bool:
+    """Telegram'a yazar. wait=True ise gönderimi bekler ve Telegram'ın kabul edip etmediğini döndürür."""
     token, chat = os.environ.get("HQ_TG_TOKEN"), os.environ.get("HQ_TG_CHAT")
     if not (token and chat):
-        return
+        return False
 
-    def send():
+    def send() -> bool:
         try:
             data = urllib.parse.urlencode({"chat_id": chat, "text": text[:3500]}).encode()
-            urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=10)
+            with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=10) as r:
+                return r.status == 200
         except Exception:
-            pass
+            return False
 
+    if wait:
+        return send()
     threading.Thread(target=send, daemon=True).start()
+    return True
 
 
 def _meta() -> dict:
@@ -245,6 +251,17 @@ def init_app(app) -> None:
         if not token or request.headers.get("Authorization") != f"Bearer {token}":
             abort(404)
         raise RuntimeError("TEST — alarm denemesi (bilerek üretilen hata, müşteri etkilenmedi)")
+
+    @app.post("/_hq/buy-selftest")
+    def _buy_selftest():
+        """Satın alma bildirimini müşteri olmadan dener: yalnızca STATS_TOKEN ile. Satın alma olarak KAYDEDİLMEZ
+        (istatistik bozulmaz); gerçek bildirimle aynı yoldan 'TEST' etiketli bir Telegram mesajı gider."""
+        token = os.environ.get("STATS_TOKEN")
+        if not token or request.headers.get("Authorization") != f"Bearer {token}":
+            abort(404)
+        sent = _notify(f"🧪 TEST — satın alma bildirimi denemesi ({_app_title()}). Gerçek müşteri değil, "
+                       "işlem gerekmez.", wait=True)
+        return jsonify(telegram=sent, payment_url=bool(os.environ.get("PAYMENT_URL")))
 
     @app.post("/_hq/event")
     def _event():
