@@ -3,6 +3,9 @@
 - Sayfa görüntüleme + günlük tekil ziyaretçi (IP/UA özeti saklanır, ham IP saklanmaz)
 - Bekleme listesi (/_hq/waitlist) ve geri bildirim (/_hq/feedback)
 - Satın alma isteği (/_hq/buy): anında Telegram bildirimi; PAYMENT_URL ayarlıysa ödeme sayfasına yönlendirir
+- Hata alarmı: uygulamada ERROR seviyesinde kaydedilen her istisna (yakalanmamış 500'ler dahil) anında Telegram'a
+  gider (aynı hata 10 dakikada en fazla bir kez) ve /stats içinde raporlanır. /_hq/selftest-error (STATS_TOKEN ile)
+  alarmı canlıda denemek için bilerek hata üretir.
 - /stats: STATS_TOKEN ile korunan özet; Agent HQ Analiz ekibi düzenli okur
 - Yeni kayıt/geri bildirim olunca (HQ_TG_TOKEN + HQ_TG_CHAT varsa) Telegram bildirimi
 
@@ -12,7 +15,9 @@ Not: Ücretsiz barındırmada disk geçicidir; uygulama yeniden başlayınca say
 Bu yüzden /stats bir boot_id döndürür ve HQ her açılışın verisini ayrı ayrı biriktirir.
 """
 import hashlib
+import logging
 import os
+import traceback
 import re
 import sqlite3
 import threading
@@ -23,7 +28,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import abort, flash, jsonify, redirect, request
+from flask import abort, flash, has_request_context, jsonify, redirect, request
 
 BASE = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("DATA_DIR", BASE / "data")) / "hq.sqlite3"
@@ -43,6 +48,7 @@ def _db() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS feedback (ts TEXT, text TEXT, page TEXT);
         CREATE TABLE IF NOT EXISTS events (ts TEXT, name TEXT, page TEXT);
         CREATE TABLE IF NOT EXISTS purchases (ts TEXT, email TEXT, page TEXT);
+        CREATE TABLE IF NOT EXISTS errors (ts TEXT, path TEXT, kind TEXT, detail TEXT);
     """)
     return conn
 
@@ -106,8 +112,9 @@ STRINGS = {
         "wl_text": "Bekleme listesine katıl; ücretsiz erken erişim ve indirimler e-postana gelsin.",
         "wl_thanks": "Teşekkürler! Listeye eklendin, yenilikleri ilk sen duyacaksın. 🎉",
         "wl_dupe": "Bu e-posta zaten listede. 🙌",
-        "fb_summary": "💬 Geri bildirim gönder", "fb_btn": "Gönder",
-        "fb_ph": "Neyi sevdin, ne eksik, ne için kullanırdın?",
+        "fb_summary": "🛠️ Bir sorun mu var ya da bir şey mi eksik? Bize yaz", "fb_btn": "Gönder",
+        "fb_ph": "Ne oldu? Hangi dosyayı yükledin, ne bekliyordun, ne gördün?",
+        "fb_email_ph": "e-posta (isteğe bağlı — dönüş yapabilmemiz için)",
         "fb_short": "Geri bildirim çok kısa.", "fb_thanks": "Geri bildirimin için teşekkürler! 💬",
         "not_found": "Sayfa bulunamadı.", "too_large": "Dosya çok büyük (en fazla 10 MB).",
     },
@@ -120,8 +127,9 @@ STRINGS = {
         "wl_text": "Join the waitlist for free early access and discounts.",
         "wl_thanks": "Thanks! You're on the list — you'll hear about updates first. 🎉",
         "wl_dupe": "This email is already on the list. 🙌",
-        "fb_summary": "💬 Send feedback", "fb_btn": "Send",
-        "fb_ph": "What did you like, what's missing, what would you use it for?",
+        "fb_summary": "🛠️ Something wrong or missing? Tell us", "fb_btn": "Send",
+        "fb_ph": "What happened? What did you upload, what did you expect, what did you see?",
+        "fb_email_ph": "email (optional — so we can get back to you)",
         "fb_short": "Feedback is too short.", "fb_thanks": "Thanks for your feedback! 💬",
         "not_found": "Page not found.", "too_large": "File too large (max 10 MB).",
     },
@@ -137,7 +145,42 @@ def t(key: str) -> str:
     return STRINGS[lang()].get(key, STRINGS["tr"][key])
 
 
+_last_alert: dict[str, float] = {}
+
+
+def report_error(kind: str, detail: str) -> None:
+    """Hata kaydı + anında Telegram alarmı. Aynı hata (tür + ilk satır) 10 dakikada en fazla bir kez bildirilir."""
+    path = request.path if has_request_context() else "-"
+    _write("INSERT INTO errors(ts, path, kind, detail) VALUES (?,?,?,?)", (_now(), path[:200], kind[:120], detail[:2000]))
+    key = f"{path}|{kind}|{detail.splitlines()[0][:120] if detail else ''}"
+    now = time.time()
+    if now - _last_alert.get(key, 0) < 600:
+        return
+    _last_alert[key] = now
+    _notify(f"🔴 HATA — {_app_title()}\nSayfa: {path}\n{kind}: {detail[:600]}")
+
+
+class _ErrorAlarm(logging.Handler):
+    """ERROR seviyesindeki istisna kayıtlarını (Flask'ın 500 kaydı ve feature.py'nin logging.exception'ı) yakalar."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            if record.exc_info and record.exc_info[1] is not None:
+                exc = record.exc_info[1]
+                tb = traceback.extract_tb(record.exc_info[2])
+                where = f" ({tb[-1].filename.split('/')[-1].split(chr(92))[-1]}:{tb[-1].lineno})" if tb else ""
+                report_error(type(exc).__name__, f"{exc}{where}")
+            elif record.levelno >= logging.ERROR:
+                report_error("Error", record.getMessage())
+        except Exception:
+            pass  # alarm hiçbir zaman uygulamayı düşürmesin
+
+
 def init_app(app) -> None:
+    root = logging.getLogger()  # app.logger ve feature.py kayıtları buraya akar; tek yerde dinle (çift kayıt olmasın)
+    if not any(isinstance(h, _ErrorAlarm) for h in root.handlers):
+        root.addHandler(_ErrorAlarm(level=logging.ERROR))
+
     app.jinja_env.globals["hq_price"] = os.environ.get("PRICE_TEXT", "")
     app.jinja_env.globals["hq_t"] = t
     app.jinja_env.globals["hq_lang"] = lang
@@ -182,13 +225,26 @@ def init_app(app) -> None:
     @app.post("/_hq/feedback")
     def _feedback():
         text = (request.form.get("text") or "").strip()[:2000]
+        email = (request.form.get("email") or "").strip().lower()[:254]
+        if email and not EMAIL_RE.match(email):
+            email = ""
         if len(text) < 3:
             flash(t("fb_short"), "error")
         else:
-            _write("INSERT INTO feedback(ts, text, page) VALUES (?,?,?)", (_now(), text, (request.referrer or "")[:200]))
+            stored = f"[{email}] {text}" if email else text
+            _write("INSERT INTO feedback(ts, text, page) VALUES (?,?,?)", (_now(), stored, (request.referrer or "")[:200]))
             flash(t("fb_thanks"), "success")
-            _notify(f"💬 {_app_title()} geri bildirim: {text[:500]}")
+            _notify(f"🛠️ {_app_title()} — kullanıcı bildirimi" + (f" ({email}, cevap bekliyor)" if email else "")
+                    + f"\nSayfa: {request.referrer or '-'}\n{text[:800]}")
         return redirect(request.referrer or "/")
+
+    @app.post("/_hq/selftest-error")
+    def _selftest_error():
+        """Alarm zincirini canlıda denemek için: yalnızca STATS_TOKEN ile, bilerek 500 üretir."""
+        token = os.environ.get("STATS_TOKEN")
+        if not token or request.headers.get("Authorization") != f"Bearer {token}":
+            abort(404)
+        raise RuntimeError("TEST — alarm denemesi (bilerek üretilen hata, müşteri etkilenmedi)")
 
     @app.post("/_hq/event")
     def _event():
@@ -216,5 +272,7 @@ def init_app(app) -> None:
                 signups=[{"ts": t, "email": e} for t, e in q("SELECT ts, email FROM signups ORDER BY ts")],
                 feedback=[{"ts": t, "text": x} for t, x in q("SELECT ts, text FROM feedback ORDER BY ts")],
                 purchases=[{"ts": t, "email": e} for t, e in q("SELECT ts, email FROM purchases ORDER BY ts")],
+                errors=[{"ts": t, "path": p, "kind": k, "detail": d} for t, p, k, d in
+                        q("SELECT ts, path, kind, detail FROM errors ORDER BY ts DESC LIMIT 50")],
                 events=[{"name": n, "count": c} for n, c in q("SELECT name, COUNT(*) FROM events GROUP BY name")],
             )

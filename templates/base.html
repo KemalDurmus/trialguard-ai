@@ -49,6 +49,7 @@
       <summary>{{ hq_t('fb_summary') }}</summary>
       <form method="post" action="/_hq/feedback">
         <textarea name="text" rows="3" maxlength="2000" placeholder="{{ hq_t('fb_ph') }}" required></textarea>
+        <input type="email" name="email" maxlength="254" placeholder="{{ hq_t('fb_email_ph') }}">
         <button type="submit" class="btn-secondary">{{ hq_t('fb_btn') }}</button>
       </form>
     </details>
